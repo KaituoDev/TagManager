@@ -1,0 +1,29 @@
+{
+	"schemaVersion": 1,
+	"id": "tag-manager",
+	"version": "${version}",
+	"name": "Tag Manager",
+	"description": "Manage the prefixes in LuckPerms as Tags.",
+	"authors": [
+		"LeChocolatChaud"
+	],
+	"contact": {
+		"sources": "https://github.com/KaituoDev/TagManager"
+	},
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"fun.kaituo.tagmanager.TagManager"
+		]
+	},
+	"mixins": [
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*",
+		"luckperms": ">=5.0"
+	}
+}
