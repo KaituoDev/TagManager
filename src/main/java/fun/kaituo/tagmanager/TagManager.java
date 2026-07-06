@@ -1,6 +1,7 @@
 package fun.kaituo.tagmanager;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.resources.Identifier;
 
 import org.slf4j.Logger;
@@ -13,15 +14,17 @@ public class TagManager implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static final HashMap<String, String> tags = new HashMap<>();
     public static final TagConfiguration config = new TagConfiguration(tags, LOGGER);
-    public static final TagCommands commands = new TagCommands(tags, config);
+    public static final TagCommands commands = new TagCommands(tags, config, LOGGER);
 
     @Override
     public void onInitialize() {
         config.load();
         commands.register();
+        ServerLifecycleEvents.SERVER_STOPPING.register(_ -> {
+            LOGGER.info("Server stopping... saving mod config.");
+            config.save();
+        });
     }
-
-
 
     public static Identifier id(String path) {
         return Identifier.fromNamespaceAndPath(MOD_ID, path);
