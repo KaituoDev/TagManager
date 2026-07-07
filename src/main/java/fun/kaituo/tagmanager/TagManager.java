@@ -12,9 +12,8 @@ import java.util.HashMap;
 public class TagManager implements ModInitializer {
     public static final String MOD_ID = "tag-manager";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    public static final HashMap<String, String> tags = new HashMap<>();
-    public static final TagConfiguration config = new TagConfiguration(tags, LOGGER);
-    public static final TagCommands commands = new TagCommands(tags, config, LOGGER);
+    public static final TagConfiguration config = new TagConfiguration(LOGGER);
+    public static final TagCommands commands = new TagCommands(config, LOGGER);
 
     @Override
     public void onInitialize() {
