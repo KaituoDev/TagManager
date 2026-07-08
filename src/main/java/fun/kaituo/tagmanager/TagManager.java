@@ -2,6 +2,7 @@ package fun.kaituo.tagmanager;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.luckperms.api.LuckPermsProvider;
 import net.minecraft.resources.Identifier;
 
 import org.slf4j.Logger;
@@ -12,11 +13,12 @@ import java.util.HashMap;
 public class TagManager implements ModInitializer {
     public static final String MOD_ID = "tag-manager";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    public static final TagConfiguration config = new TagConfiguration(LOGGER);
-    public static final TagCommands commands = new TagCommands(config, LOGGER);
+    private static final HashMap<String, Tag> tags = new HashMap<>();
 
     @Override
     public void onInitialize() {
+        TagConfiguration config = new TagConfiguration(tags, LOGGER);
+        TagCommands commands = new TagCommands(config, LOGGER);
         config.load();
         commands.register();
         ServerLifecycleEvents.SERVER_STOPPING.register(_ -> {
