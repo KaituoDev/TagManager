@@ -25,6 +25,7 @@
 		"java": ">=25",
 		"fabric-api": "*",
 		"luckperms": ">=5.4.0",
-		"placeholder-api": "*"
+		"placeholder-api": "*",
+		"fabric-permissions-api-v0": "*"
 	}
 }

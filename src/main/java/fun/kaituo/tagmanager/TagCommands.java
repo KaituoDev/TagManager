@@ -9,21 +9,19 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import eu.pb4.placeholders.api.parsers.NodeParser;
 import eu.pb4.placeholders.api.parsers.TagParser;
+import me.lucko.fabric.api.permissions.v0.Permissions;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.model.user.UserManager;
 import net.luckperms.api.node.NodeType;
 import net.luckperms.api.node.types.PermissionNode;
 import net.luckperms.api.node.types.PrefixNode;
-import net.luckperms.api.query.QueryOptions;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permission;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
@@ -34,6 +32,7 @@ import java.net.http.HttpResponse;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public final class TagCommands {
@@ -48,51 +47,261 @@ public final class TagCommands {
 
     public void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(Commands.literal("tags").executes(this::run0Args)
-                    .then(Commands.argument("action", StringArgumentType.word()).executes(this::run1Args)
-                            .then(Commands.argument("payload1", StringArgumentType.word()).executes(this::run2Args)
-                                    .then(Commands.argument("payload2", StringArgumentType.word()).executes(this::run3Args)
-                                            .then(Commands.argument("payload3", StringArgumentType.word()).executes(this::run4Args)
-                                            )))));
+            dispatcher.register(
+                    Commands.literal("tags").executes(this::usage)
+                            .then(Commands.literal("help").executes(this::usage))
+                            .then(Commands.literal("list").executes(this::list))
+                            .then(Commands.literal("listall").requires(Permissions.require("kaituotags.command.listall")).executes(this::listAll))
+                            .then(Commands.literal("reload").requires(Permissions.require("kaituotags.command.reload")).executes(this::reload))
+                            .then(Commands.literal("create").requires(Permissions.require("kaituotags.command.create"))
+                                    .then(Commands.argument("id", StringArgumentType.word())
+                                            .then(Commands.argument("format", StringArgumentType.greedyString()).executes(this::createWithFormat)
+                                                    .then(Commands.argument("description", StringArgumentType.greedyString()).executes(this::createWithFormatDesc)))))
+                            .then(Commands.literal("delete").requires(Permissions.require("kaituotags.command.create"))
+                                    .then(Commands.argument("id", StringArgumentType.word()).executes(this::delete)))
+                            .then(Commands.literal("grant").requires(Permissions.require("kaituotags.command.grant"))
+                                    .then(Commands.argument("player", StringArgumentType.word())
+                                            .then(Commands.argument("id", StringArgumentType.word()).executes(this::grant))))
+                            .then(Commands.literal("revoke").requires(Permissions.require("kaituotags.command.revoke"))
+                                    .then(Commands.argument("player", StringArgumentType.word()).executes(this::revokeAll)
+                                            .then(Commands.argument("id", StringArgumentType.word()).executes(this::revokeOne))))
+                            .then(Commands.literal("assign")
+                                    .then(Commands.argument("id", StringArgumentType.word()).executes(this::assignSelf)
+                                            .then(Commands.argument("player", StringArgumentType.word()).requires(Permissions.require("kaituotags.command.assign")).executes(this::assignPlayer))))
+                            .then(Commands.literal("unassign").executes(this::unassignSelf)
+                                    .then(Commands.argument("player", StringArgumentType.word()).requires(Permissions.require("kaituotags.command.unassign")).executes(this::unassignPlayer)))
+            );
         });
     }
 
-    private UserManager getUserManager() {
-        return LuckPermsProvider.get().getUserManager();
-    }
-
-    private boolean checkPermission(User user, String permission) {
-        return user.resolveInheritedNodes(QueryOptions.defaultContextualOptions()).contains(PermissionNode.builder(permission).value(true).build());
-    }
-
-    private int run0Args(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+    private int usage(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         CommandSourceStack source = context.getSource();
         source.sendSystemMessage(Component.literal("Usage:").withColor(TextColor.AQUA));
         source.sendSystemMessage(Component.literal("/tags list").withColor(TextColor.AQUA));
-        if (source.isPlayer() &&
-                checkPermission(
-                        Objects.requireNonNull(getUserManager().getUser(source.getPlayerOrException().getUUID())),
-                        "kaituotags.command.listall")) {
+        if (Permissions.check(source, "kaituotags.command.listall")) {
             source.sendSystemMessage(Component.literal("/tags listall").withColor(TextColor.AQUA));
         }
         source.sendSystemMessage(Component.literal("/tags reload").withColor(TextColor.AQUA));
         source.sendSystemMessage(Component.literal("/tags create <id> <format> [description]").withColor(TextColor.AQUA));
         source.sendSystemMessage(Component.literal("/tags delete <id>").withColor(TextColor.AQUA));
-        if (source.isPlayer() &&
-                checkPermission(
-                        Objects.requireNonNull(getUserManager().getUser(source.getPlayerOrException().getUUID())),
-                        "kaituotags.command.grant")) {
+        if (Permissions.check(source, "kaituotags.command.grant")) {
             source.sendSystemMessage(Component.literal("/tags grant <player> <id>").withColor(TextColor.AQUA));
         }
-        if (source.isPlayer() &&
-                checkPermission(
-                        Objects.requireNonNull(getUserManager().getUser(source.getPlayerOrException().getUUID())),
-                        "kaituotags.command.grant")) {
+        if (Permissions.check(source, "kaituotags.command.revoke")) {
             source.sendSystemMessage(Component.literal("/tags revoke <player> [id]").withColor(TextColor.AQUA));
         }
         source.sendSystemMessage(Component.literal("/tags assign <id> [player]").withColor(TextColor.AQUA));
         source.sendSystemMessage(Component.literal("/tags unassign [player]").withColor(TextColor.AQUA));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int list(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            throw new SimpleCommandExceptionType(() -> "The list command can only be run by a player!").create();
+        }
+        User user = getUserManager().getUser(player.getUUID());
+        if (user == null) {
+            throw new SimpleCommandExceptionType(() -> "The list command can only be run by a player!").create();
+        }
+        Map<String, Tag> obtainedTags = getUserObtainedTags(user);
+        if (obtainedTags.isEmpty()) {
+            source.sendSystemMessage(Component.literal("You have no obtained tags"));
+            return 0;
+        }
+        source.sendSystemMessage(Component.literal("All tags obtained:"));
+        for (Map.Entry<String, Tag> entry : obtainedTags.entrySet()) {
+            source.sendSystemMessage(
+                    literalParser.parseNode(
+                            entry.getKey() + "<reset>: " +
+                                    entry.getValue().prefix +
+                                    "<reset> (" + entry.getValue().description + "<reset>) ").toComponent());
+        }
+        return obtainedTags.size();
+    }
+
+    private int listAll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        source.sendSystemMessage(Component.literal("All tags registered:"));
+        for (Map.Entry<String, Tag> entry : config.tags.entrySet()) {
+            source.sendSystemMessage(
+                    literalParser.parseNode(
+                            entry.getKey() + "<reset>: " +
+                                    entry.getValue().prefix +
+                                    "<reset> (" + entry.getValue().description + "<reset>) ").toComponent());
+        }
+        return config.tags.size();
+    }
+
+    private int reload(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        config.reload();
+        source.sendSystemMessage(Component.literal("Tags reloaded!").withColor(TextColor.YELLOW));
+        return config.tags.size();
+    }
+
+    private int createWithFormat(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String id = StringArgumentType.getString(context, "id");
+        String format = StringArgumentType.getString(context, "format");
+        config.tags.put(id, new Tag(format, null));
+        source.sendSystemMessage(literalParser.parseNode(
+                "Successfully created tag " + format + "<reset> with id " + id).toComponent());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int createWithFormatDesc(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String id = StringArgumentType.getString(context, "id");
+        String format = StringArgumentType.getString(context, "format");
+        String description = StringArgumentType.getString(context, "description");
+        config.tags.put(id, new Tag(format, description));
+        source.sendSystemMessage(literalParser.parseNode(
+                "Successfully created tag " + format + "<reset> (" + description + "<reset) with id " + id).toComponent());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int delete(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String id = StringArgumentType.getString(context, "id");
+        Tag removed = config.tags.remove(id);
+        if (removed == null) {
+            throw new SimpleCommandExceptionType(() -> "No tag with id " + id + " exists").create();
+        }
+        source.sendSystemMessage(Component.literal("Successfully removed tag " + id));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int grant(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String player = StringArgumentType.getString(context, "player");
+        String id = StringArgumentType.getString(context, "id");
+        if (!config.tags.containsKey(id)) {
+            throw new SimpleCommandExceptionType(() -> "Tag " + id + " not found").create();
+        }
+        modifyOfflineUser(source, player, offlineUser -> {
+                    PermissionNode permissionNode = PermissionNode.builder("kaituotags.tag." + id).build();
+                    offlineUser.data().add(permissionNode);
+                },
+                exactName -> Component.literal("Successfully granted tag " + id + " to " + exactName));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int revokeAll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String player = StringArgumentType.getString(context, "player");
+        modifyOfflineUser(source, player,
+                (offlineUser -> offlineUser.data().clear(
+                        node -> node.getType() == NodeType.PERMISSION && tagNodeFilter((PermissionNode) node))),
+                exactName -> Component.literal("Successfully revoked all tags granted to " + exactName));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int revokeOne(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String player = StringArgumentType.getString(context, "player");
+        String id = StringArgumentType.getString(context, "id");
+        if (!config.tags.containsKey(id)) {
+            throw new SimpleCommandExceptionType(() -> "Tag " + id + " not found").create();
+        }
+        modifyOfflineUser(source, player, user -> {
+                    user.data().remove(PermissionNode.builder("kaituotags.tag." + id).build());
+                    user.data().remove(PermissionNode.builder("eternaltags.tag." + id).build());
+                    user.data().remove(PermissionNode.builder("delxuetags.tag." + id).build());
+                },
+                exactName -> Component.literal("Successfully revoked tag " + id + " from " + exactName));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int assignSelf(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            throw new SimpleCommandExceptionType(() -> "The assign command without an assignee can only be run by a player!").create();
+        }
+        String id = StringArgumentType.getString(context, "id");
+        if (!config.tags.containsKey(id)) {
+            throw new SimpleCommandExceptionType(() -> "Tag " + id + " not found").create();
+        }
+        modifyOfflineUser(source, player.getPlainTextName(), user -> {
+            if (user.getNodes(NodeType.PERMISSION).stream().noneMatch(
+                    node ->
+                            node.getPermission().equals("kaituotags.tag." + id) ||
+                                    node.getPermission().equals("eternaltags.tag." + id) ||
+                                    node.getPermission().equals("deluxetags.tag." + id))) {
+                source.sendSystemMessage(Component.literal("You don't have the tag " + id).withColor(TextColor.RED));
+                return;
+            }
+            user.data().clear(
+                    node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10);
+            Tag tag = config.tags.get(id);
+            String hoverablePrefix = "<hover:\"" +
+                    tag.description +
+                    "\">" +
+                    tag.prefix +
+                    "</hover>";
+            PrefixNode prefixNode = PrefixNode.builder(hoverablePrefix, 10).build();
+            user.data().add(prefixNode);
+        }, _ -> Component.literal("Successfully assigned tag " + id + " to you"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int assignPlayer(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String id = StringArgumentType.getString(context, "id");
+        String player = StringArgumentType.getString(context, "player");
+        if (!config.tags.containsKey(id)) {
+            throw new SimpleCommandExceptionType(() -> "Tag " + id + " not found").create();
+        }
+        modifyOfflineUser(source, player, user -> {
+            if (user.getNodes(NodeType.PERMISSION).stream().noneMatch(
+                    node ->
+                            node.getPermission().equals("kaituotags.tag." + id) ||
+                                    node.getPermission().equals("eternaltags.tag." + id) ||
+                                    node.getPermission().equals("deluxetags.tag." + id))) {
+                source.sendSystemMessage(Component.literal("The specified player doesn't have the tag " + id).withColor(TextColor.RED));
+                return;
+            }
+            user.data().clear(
+                    node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10);
+            Tag tag = config.tags.get(id);
+            String sb = "<hover:\"" +
+                    tag.description +
+                    "\">" +
+                    tag.prefix +
+                    "</hover>";
+            PrefixNode prefixNode = PrefixNode.builder(sb, 10).build();
+            user.data().add(prefixNode);
+        }, exactName -> Component.literal("Successfully assigned tag " + id + " to " + exactName));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int unassignSelf(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            throw new SimpleCommandExceptionType(() -> "The unassign command without an assignee can only be run by a player").create();
+        }
+        modifyOfflineUser(source, player.getPlainTextName(),
+                (offlineUser -> offlineUser.data().clear(
+                        node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10)),
+                _ -> Component.literal("Successfully unassigned all your tags"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int unassignPlayer(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        String player = StringArgumentType.getString(context, "player");
+        modifyOfflineUser(source, player,
+                (offlineUser -> offlineUser.data().clear(
+                        node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10)),
+                exactName -> Component.literal("Successfully unassigned all tags from " + exactName));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private UserManager getUserManager() {
+        return LuckPermsProvider.get().getUserManager();
     }
 
     private static boolean tagNodeFilter(PermissionNode node) {
@@ -127,10 +336,12 @@ public final class TagCommands {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    private void modifyOfflineUser(CommandSourceStack source, String name, Consumer<User> modifyingFunction, Component successMessage) {
-        CompletableFuture<Void> modifyFuture =
-                getUUIDFromName(name).thenComposeAsync(uuid -> getUserManager().modifyUser(uuid, modifyingFunction));
-        modifyFuture.whenCompleteAsync((_, exception) -> {
+    private void modifyOfflineUser(CommandSourceStack source, String name, Consumer<User> modifyingFunction, Function<String, Component> successMessage) {
+        CompletableFuture<String> modifyFuture = getProfileFromName(name).thenComposeAsync(profile -> {
+            getUserManager().modifyUser(parseUUID(profile.id), modifyingFunction);
+            return CompletableFuture.completedFuture(profile.name);
+        });
+        modifyFuture.whenCompleteAsync((player, exception) -> {
             if (exception != null) {
                 logger.error("An exception occurred when getting User from LuckPerms", exception);
                 source.sendSystemMessage(
@@ -138,243 +349,11 @@ public final class TagCommands {
                                 .withColor(TextColor.RED));
                 return;
             }
-            source.sendSystemMessage(successMessage);
+            source.sendSystemMessage(successMessage.apply(player));
         });
     }
 
-    private int run1Args(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        String action = StringArgumentType.getString(context, "action");
-        CommandSourceStack source = context.getSource();
-        ServerPlayer player = source.getPlayer();
-        User user = null;
-        if (player != null) {
-            user = getUserManager().getUser(player.getUUID());
-        }
-        switch (action) {
-            case "list":
-                if (user == null) {
-                    source.sendSystemMessage(Component.literal(
-                            "The list command can only be run by a player!").withColor(TextColor.RED));
-                    break;
-                }
-                Map<String, Tag> obtainedTags = getUserObtainedTags(user);
-                if (obtainedTags.isEmpty()) {
-                    source.sendSystemMessage(Component.literal("You have no obtained tags"));
-                    break;
-                }
-                source.sendSystemMessage(Component.literal("All tags obtained:"));
-                for (Map.Entry<String, Tag> entry : obtainedTags.entrySet()) {
-                    source.sendSystemMessage(
-                            literalParser.parseNode(
-                                    entry.getKey() + "<reset>: " +
-                                            entry.getValue().prefix +
-                                            "<reset> (" + entry.getValue().description + "<reset>) ").toComponent());
-                }
-                break;
-            case "listall":
-                if (source.isPlayer() &&
-                        !checkPermission(
-                                Objects.requireNonNull(getUserManager().getUser(source.getPlayerOrException().getUUID())),
-                                "kaituotags.command.listall")) {
-                    source.sendSystemMessage(Component.literal("You don't have the permission to run this command!").withColor(TextColor.RED));
-                    break;
-                }
-                source.sendSystemMessage(Component.literal("All tags registered:"));
-                for (Map.Entry<String, Tag> entry : config.tags.entrySet()) {
-                    source.sendSystemMessage(
-                            literalParser.parseNode(
-                                    entry.getKey() + "<reset>: " +
-                                            entry.getValue().prefix +
-                                            "<reset> (" + entry.getValue().description + "<reset>) ").toComponent());
-                }
-                break;
-            case "reload":
-                config.reload();
-                source.sendSystemMessage(Component.literal("Tags reloaded!").withColor(TextColor.YELLOW));
-                break;
-            case "unassign":
-                if (user == null) {
-                    source.sendSystemMessage(Component.literal(
-                            "The unassign command without an assignee can only be run by a player!").withColor(TextColor.RED));
-                    break;
-                }
-                user.data().clear(node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10);
-                getUserManager().saveUser(user);
-                source.sendSystemMessage(Component.literal("Cleared your currently assigned tag"));
-                break;
-            default:
-                throw new SimpleCommandExceptionType(() -> "Invalid action: " + action).create();
-        }
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int run2Args(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        String action = StringArgumentType.getString(context, "action");
-        String payload1 = StringArgumentType.getString(context, "payload1");
-        CommandSourceStack source = context.getSource();
-        switch (action) {
-            case "delete":
-                Tag removed = config.tags.remove(payload1);
-                if (removed == null) {
-                    source.sendSystemMessage(Component.literal("No tag with id " + payload1 + " exists").withColor(TextColor.RED));
-                    break;
-                }
-                source.sendSystemMessage(Component.literal("Successfully removed tag " + payload1));
-                break;
-            case "revoke":
-                if (source.isPlayer() &&
-                        !checkPermission(
-                                Objects.requireNonNull(getUserManager().getUser(source.getPlayerOrException().getUUID())),
-                                "kaituotags.command.revoke")) {
-                    source.sendSystemMessage(Component.literal("You don't have the permission to run this command!").withColor(TextColor.RED));
-                    break;
-                }
-                modifyOfflineUser(source, payload1,
-                        (offlineUser -> offlineUser.data().clear(
-                                node -> node.getType() == NodeType.PERMISSION && tagNodeFilter((PermissionNode) node))),
-                        Component.literal("Successfully revoked all tags granted to " + payload1));
-                break;
-            case "assign":
-                ServerPlayer player = source.getPlayer();
-                if (player == null) {
-                    source.sendSystemMessage(Component.literal(
-                            "The assign command without an assignee can only be run by a player!").withColor(TextColor.RED));
-                    break;
-                }
-                if (!config.tags.containsKey(payload1)) {
-                    source.sendSystemMessage(Component.literal("Tag " + payload1 + " not found").withColor(TextColor.RED));
-                    break;
-                }
-                modifyOfflineUser(source, player.getPlainTextName(), user -> {
-                    if (user.getNodes(NodeType.PERMISSION).stream().noneMatch(
-                            node ->
-                                    node.getPermission().equals("kaituotags.tag." + payload1) ||
-                                            node.getPermission().equals("eternaltags.tag." + payload1) ||
-                                            node.getPermission().equals("deluxetags.tag." + payload1))) {
-                        source.sendSystemMessage(Component.literal("You don't have the tag " + payload1).withColor(TextColor.RED));
-                        return;
-                    }
-                    user.data().clear(
-                            node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10);
-                    Tag tag = config.tags.get(payload1);
-                    String sb = "<hover:\"" +
-                            tag.description +
-                            "\">" +
-                            tag.prefix +
-                            "</hover>";
-                    PrefixNode prefixNode = PrefixNode.builder(sb, 10).build();
-                    user.data().add(prefixNode);
-                }, Component.literal("Successfully assigned tag " + payload1 + " to you"));
-                break;
-            case "unassign":
-                modifyOfflineUser(source, payload1,
-                        (offlineUser -> offlineUser.data().clear(
-                                node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10)),
-                        Component.literal("Successfully unassigned all tags from " + payload1));
-                break;
-            default:
-                throw new SimpleCommandExceptionType(() -> "Invalid action: " + action).create();
-        }
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int run3Args(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        String action = StringArgumentType.getString(context, "action");
-        String payload1 = StringArgumentType.getString(context, "payload1");
-        String payload2 = StringArgumentType.getString(context, "payload2");
-        CommandSourceStack source = context.getSource();
-        switch (action) {
-            case "create":
-                config.tags.put(payload1, new Tag(payload2, null));
-                source.sendSystemMessage(literalParser.parseNode(
-                        "Successfully created tag (id " + payload1 + "<reset>) " + payload2).toComponent());
-                break;
-            case "grant":
-                if (source.isPlayer() &&
-                        !checkPermission(
-                                Objects.requireNonNull(getUserManager().getUser(source.getPlayerOrException().getUUID())),
-                                "kaituotags.command.grant")) {
-                    source.sendSystemMessage(Component.literal("You don't have the permission to run this command!").withColor(TextColor.RED));
-                    break;
-                }
-                if (!config.tags.containsKey(payload2)) {
-                    source.sendSystemMessage(Component.literal("Tag " + payload2 + " not found").withColor(TextColor.RED));
-                    break;
-                }
-                modifyOfflineUser(source, payload1, offlineUser -> {
-                            PermissionNode permissionNode = PermissionNode.builder("kaituotags.tag." + payload2).build();
-                            offlineUser.data().add(permissionNode);
-                        },
-                        Component.literal("Successfully granted tag " + payload2 + " to " + payload1));
-                break;
-            case "revoke":
-                if (source.isPlayer() &&
-                        !checkPermission(
-                                Objects.requireNonNull(getUserManager().getUser(source.getPlayerOrException().getUUID())),
-                                "kaituotags.command.revoke")) {
-                    source.sendSystemMessage(Component.literal("You don't have the permission to run this command!").withColor(TextColor.RED));
-                    break;
-                }
-                if (!config.tags.containsKey(payload2)) {
-                    source.sendSystemMessage(Component.literal("Tag " + payload2 + " not found").withColor(TextColor.RED));
-                    break;
-                }
-                modifyOfflineUser(source, payload1, user -> {
-                            user.data().remove(PermissionNode.builder("kaituotags.tag." + payload2).build());
-                            user.data().remove(PermissionNode.builder("eternaltags.tag." + payload2).build());
-                            user.data().remove(PermissionNode.builder("delxuetags.tag." + payload2).build());
-                        },
-                        Component.literal("Successfully revoked tag " + payload2 + " from " + payload1));
-                break;
-            case "assign":
-                if (!config.tags.containsKey(payload1)) {
-                    source.sendSystemMessage(Component.literal("Tag " + payload1 + " not found").withColor(TextColor.RED));
-                    break;
-                }
-                modifyOfflineUser(source, payload2, user -> {
-                    if (user.getNodes(NodeType.PERMISSION).stream().noneMatch(
-                            node ->
-                                    node.getPermission().equals("kaituotags.tag." + payload1) ||
-                                            node.getPermission().equals("eternaltags.tag." + payload1) ||
-                                            node.getPermission().equals("deluxetags.tag." + payload1))) {
-                        source.sendSystemMessage(Component.literal("The player " + payload2 + " doesn't have the tag " + payload1).withColor(TextColor.RED));
-                        return;
-                    }
-                    user.data().clear(
-                            node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10);
-                    Tag tag = config.tags.get(payload1);
-                    String sb = "<hover:\"" +
-                            tag.description +
-                            "\">" +
-                            tag.prefix +
-                            "</hover>";
-                    PrefixNode prefixNode = PrefixNode.builder(sb, 10).build();
-                    user.data().add(prefixNode);
-                }, Component.literal("Successfully assigned tag " + payload1 + " to " + payload2));
-                break;
-            default:
-                throw new SimpleCommandExceptionType(() -> "Invalid action: " + action).create();
-        }
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int run4Args(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        String action = StringArgumentType.getString(context, "action");
-        String payload1 = StringArgumentType.getString(context, "payload1");
-        String payload2 = StringArgumentType.getString(context, "payload2");
-        String payload3 = StringArgumentType.getString(context, "payload3");
-        CommandSourceStack source = context.getSource();
-        if (!action.equals("create")) {
-            throw new SimpleCommandExceptionType(() -> "Invalid action: " + action).create();
-        }
-        config.tags.put(payload1, new Tag(payload2, null));
-        source.sendSystemMessage(literalParser.parseNode(
-                "Successfully created tag (id " + payload1 + "<reset>) " + payload2 + "<reset> with description " + payload3
-        ).toComponent());
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private static CompletableFuture<UUID> getUUIDFromName(String name) {
+    private static CompletableFuture<MojangProfile> getProfileFromName(String name) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://api.mojang.com/users/profiles/minecraft/" + name))
                 .GET()
@@ -386,8 +365,7 @@ public final class TagCommands {
                         // Status 204 means the player does not exist
                         if (response.statusCode() == 204) return null;
 
-                        MojangProfile profile = new Gson().fromJson(response.body(), MojangProfile.class);
-                        return parseUUID(profile.id);
+                        return new Gson().fromJson(response.body(), MojangProfile.class);
                     });
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
@@ -400,7 +378,7 @@ public final class TagCommands {
     }
 
     static class MojangProfile {
-        public String id;   // The UUID (un-dashed)
-        public String name; // The exact username
+        String id;   // The UUID (un-dashed)
+        String name; // The exact username
     }
 }
