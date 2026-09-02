@@ -2,7 +2,6 @@ package fun.kaituo.tagmanager;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.luckperms.api.LuckPermsProvider;
 import net.minecraft.resources.Identifier;
 
 import org.slf4j.Logger;
@@ -27,6 +26,7 @@ public class TagManager implements ModInitializer {
         });
     }
 
+    @SuppressWarnings("unused")
     public static Identifier id(String path) {
         return Identifier.fromNamespaceAndPath(MOD_ID, path);
     }

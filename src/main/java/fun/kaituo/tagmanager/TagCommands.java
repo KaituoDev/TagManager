@@ -1,7 +1,6 @@
 package fun.kaituo.tagmanager;
 
 
-import com.google.gson.Gson;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -30,14 +29,11 @@ import net.minecraft.server.dialog.action.StaticAction;
 import net.minecraft.server.dialog.body.DialogBody;
 import net.minecraft.server.dialog.body.PlainMessage;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permission;
 import net.minecraft.server.permissions.PermissionLevel;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -55,34 +51,33 @@ public final class TagCommands {
     }
 
     public void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(
-                    Commands.literal("tags").executes(this::ui)
-                            .then(Commands.literal("help").executes(this::usage))
-                            .then(Commands.literal("list").executes(this::list))
-                            .then(Commands.literal("listall").requires(Permissions.require("kaituotags.command.listall")).executes(this::listAll))
-                            .then(Commands.literal("reload").requires(Permissions.require("kaituotags.command.reload")).executes(this::reload))
-                            .then(Commands.literal("create").requires(Permissions.require("kaituotags.command.create"))
-                                    .then(Commands.argument("id", StringArgumentType.word())
-                                            .then(Commands.argument("format", StringArgumentType.string()).executes(this::createWithFormat)
-                                                    .then(Commands.argument("description", StringArgumentType.greedyString()).executes(this::createWithFormatDesc)))))
-                            .then(Commands.literal("delete").requires(Permissions.require("kaituotags.command.create"))
-                                    .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestAllTagIds).executes(this::delete)))
-                            .then(Commands.literal("grant").requires(Permissions.require("kaituotags.command.grant"))
-                                    .then(Commands.argument("player", StringArgumentType.word()).suggests(this::suggestAllPlayerNames)
-                                            .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestAllTagIds).executes(this::grant))))
-                            .then(Commands.literal("revoke").requires(Permissions.require("kaituotags.command.revoke"))
-                                    .then(Commands.argument("player", StringArgumentType.word()).suggests(this::suggestAllPlayerNames).executes(this::revokeAll)
-                                            .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestObtainedTagIds).executes(this::revokeOne))))
-                            .then(Commands.literal("assign")
-                                    .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestObtainedTagIds).executes(this::assignSelf)
-                                            .then(Commands.argument("player", StringArgumentType.word()).requires(Permissions.require("kaituotags.command.assign"))
-                                                    .suggests(this::suggestAllPlayerNames).executes(this::assignPlayer))))
-                            .then(Commands.literal("unassign").executes(this::unassignSelf)
-                                    .then(Commands.argument("player", StringArgumentType.word()).requires(Permissions.require("kaituotags.command.unassign"))
-                                            .suggests(this::suggestAllPlayerNames).executes(this::unassignPlayer)))
-            );
-        });
+        CommandRegistrationCallback.EVENT.register((dispatcher, _, _) ->
+                dispatcher.register(
+                        Commands.literal("tags").executes(this::ui)
+                                .then(Commands.literal("help").executes(this::usage))
+                                .then(Commands.literal("list").executes(this::list))
+                                .then(Commands.literal("listall").requires(Permissions.require("kaituotags.command.listall")).executes(this::listAll))
+                                .then(Commands.literal("reload").requires(Permissions.require("kaituotags.command.reload")).executes(this::reload))
+                                .then(Commands.literal("create").requires(Permissions.require("kaituotags.command.create"))
+                                        .then(Commands.argument("id", StringArgumentType.word())
+                                                .then(Commands.argument("format", StringArgumentType.string()).executes(this::createWithFormat)
+                                                        .then(Commands.argument("description", StringArgumentType.greedyString()).executes(this::createWithFormatDesc)))))
+                                .then(Commands.literal("delete").requires(Permissions.require("kaituotags.command.create"))
+                                        .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestAllTagIds).executes(this::delete)))
+                                .then(Commands.literal("grant").requires(Permissions.require("kaituotags.command.grant"))
+                                        .then(Commands.argument("player", StringArgumentType.word()).suggests(this::suggestAllPlayerNames)
+                                                .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestAllTagIds).executes(this::grant))))
+                                .then(Commands.literal("revoke").requires(Permissions.require("kaituotags.command.revoke"))
+                                        .then(Commands.argument("player", StringArgumentType.word()).suggests(this::suggestAllPlayerNames).executes(this::revokeAll)
+                                                .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestObtainedTagIds).executes(this::revokeOne))))
+                                .then(Commands.literal("assign")
+                                        .then(Commands.argument("id", StringArgumentType.word()).suggests(this::suggestObtainedTagIds).executes(this::assignSelf)
+                                                .then(Commands.argument("player", StringArgumentType.word()).requires(Permissions.require("kaituotags.command.assign"))
+                                                        .suggests(this::suggestAllPlayerNames).executes(this::assignPlayer))))
+                                .then(Commands.literal("unassign").executes(this::unassignSelf)
+                                        .then(Commands.argument("player", StringArgumentType.word()).requires(Permissions.require("kaituotags.command.unassign"))
+                                                .suggests(this::suggestAllPlayerNames).executes(this::unassignPlayer)))
+                ));
     }
 
     private CompletableFuture<Suggestions> suggestAllTagIds(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
@@ -92,7 +87,7 @@ public final class TagCommands {
     private CompletableFuture<Suggestions> suggestObtainedTagIds(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
         try {
             String playerArg = StringArgumentType.getString(context, "player");
-            return getProfileFromName(playerArg).thenComposeAsync(profile -> getUserManager().loadUser(parseUUID(profile.id)))
+            return getUserManager().lookupUniqueId(playerArg).thenComposeAsync(id -> getUserManager().loadUser(id))
                     .thenComposeAsync(user -> {
                         Map<String, Tag> obtained = getUserObtainedTags(user);
                         return SharedSuggestionProvider.suggest(obtained.entrySet(), builder, Map.Entry::getKey, entry -> literalParser.parseNode(entry.getValue().prefix).toComponent());
@@ -102,15 +97,17 @@ public final class TagCommands {
             if (player == null) {
                 return suggestAllTagIds(context, builder);
             }
-            if (player.getPermissionContext().permissionLevel().isEqualOrHigherThan(PermissionLevel.OWNERS)) {
+            if (player.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.OWNERS))) {
                 return suggestAllTagIds(context, builder);
             }
-            User user = getUserManager().getUser(player.getUUID());
-            if (user == null) {
-                return suggestAllTagIds(context, builder);
-            }
-            Map<String, Tag> obtained = getUserObtainedTags(user);
-            return SharedSuggestionProvider.suggest(obtained.entrySet(), builder, Map.Entry::getKey, entry -> literalParser.parseNode(entry.getValue().prefix).toComponent());
+            CompletableFuture<User> userFuture = getUserManager().loadUser(player.getUUID());
+            return userFuture.thenComposeAsync((user) -> {
+                if (user == null) {
+                    return suggestAllTagIds(context, builder);
+                }
+                Map<String, Tag> obtained = getUserObtainedTags(user);
+                return SharedSuggestionProvider.suggest(obtained.entrySet(), builder, Map.Entry::getKey, entry -> literalParser.parseNode(entry.getValue().prefix).toComponent());
+            });
         }
     }
 
@@ -121,16 +118,18 @@ public final class TagCommands {
     private int ui(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
         ServerPlayer player = source.getPlayer();
-        User user = null;
-        if (player != null) {
-            user = getUserManager().getUser(player.getUUID());
-        }
-        if (user != null) {
-            player.openDialog(Holder.direct(buildObtainedTagsDialog(getUserObtainedTags(user))));
-            return Command.SINGLE_SUCCESS;
-        } else {
+        if (player == null) {
             return usage(context);
         }
+        CompletableFuture<User> userFuture = getUserManager().loadUser(player.getUUID());
+        userFuture.whenCompleteAsync((user, throwable) -> {
+            if (user == null || throwable != null) {
+                usage(context);
+                return;
+            }
+            player.openDialog(Holder.direct(buildObtainedTagsDialog(getUserObtainedTags(user))));
+        });
+        return Command.SINGLE_SUCCESS;
     }
 
     private int usage(CommandContext<CommandSourceStack> context) {
@@ -167,26 +166,29 @@ public final class TagCommands {
         if (player == null) {
             throw new SimpleCommandExceptionType(() -> "The list command can only be run by a player!").create();
         }
-        if (player.getPermissionContext().permissionLevel().isEqualOrHigherThan(PermissionLevel.OWNERS)) {
+        if (player.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.OWNERS))) {
             return listAll(context);
         }
-        User user = getUserManager().getUser(player.getUUID());
-        if (user == null) {
-            throw new SimpleCommandExceptionType(() -> "The list command can only be run by a player!").create();
-        }
-        Map<String, Tag> obtainedTags = getUserObtainedTags(user);
-        if (obtainedTags.isEmpty()) {
-            source.sendSystemMessage(Component.literal("You have no obtained tags"));
-            return 0;
-        }
-        source.sendSystemMessage(Component.literal("All tags obtained:"));
-        for (Map.Entry<String, Tag> entry : obtainedTags.entrySet()) {
-            source.sendSystemMessage(literalParser.parseNode(getTagPreview(entry.getKey(), entry.getValue())).toComponent());
-        }
-        return obtainedTags.size();
+        CompletableFuture<User> userFuture = getUserManager().loadUser(player.getUUID());
+        userFuture.whenCompleteAsync((user, throwable) -> {
+            if (user == null || throwable != null) {
+                source.sendSystemMessage(Component.literal("The list command can only be run by a player!").withColor(TextColor.RED));
+                return;
+            }
+            Map<String, Tag> obtainedTags = getUserObtainedTags(user);
+            if (obtainedTags.isEmpty()) {
+                source.sendSystemMessage(Component.literal("You have no obtained tags"));
+                return;
+            }
+            source.sendSystemMessage(Component.literal("All tags obtained:"));
+            for (Map.Entry<String, Tag> entry : obtainedTags.entrySet()) {
+                source.sendSystemMessage(literalParser.parseNode(getTagPreview(entry.getKey(), entry.getValue())).toComponent());
+            }
+        });
+        return Command.SINGLE_SUCCESS;
     }
 
-    private int listAll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+    private int listAll(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
         if (source.getPlayer() != null) {
             source.getPlayer().openDialog(Holder.direct(buildAllTagsDialog()));
@@ -290,10 +292,20 @@ public final class TagCommands {
         modifyOfflineUser(source, player, user -> {
                     user.data().remove(PermissionNode.builder("kaituotags.tag." + id).build());
                     user.data().remove(PermissionNode.builder("eternaltags.tag." + id).build());
-                    user.data().remove(PermissionNode.builder("delxuetags.tag." + id).build());
+                    user.data().remove(PermissionNode.builder("deluxetags.tag." + id).build());
                 },
                 exactName -> Component.literal("Successfully revoked tag " + id + " from " + exactName));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private @NonNull PrefixNode buildPrefixNode(String id) {
+        Tag tag = config.tags.get(id);
+        String hoverablePrefix = "<hover:\"" +
+                tag.description +
+                "\">" +
+                tag.prefix +
+                "</hover>";
+        return PrefixNode.builder(hoverablePrefix, 10).build();
     }
 
     private int assignSelf(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
@@ -307,7 +319,7 @@ public final class TagCommands {
             throw new SimpleCommandExceptionType(() -> "Tag " + id + " not found").create();
         }
         modifyOfflineUser(source, player.getPlainTextName(), user -> {
-            if (!player.getPermissionContext().permissionLevel().isEqualOrHigherThan(PermissionLevel.OWNERS) &&
+            if (!player.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.OWNERS)) &&
                     user.getNodes(NodeType.PERMISSION).stream().noneMatch(
                             node ->
                                     node.getPermission().equals("kaituotags.tag." + id) ||
@@ -318,13 +330,7 @@ public final class TagCommands {
             }
             user.data().clear(
                     node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10);
-            Tag tag = config.tags.get(id);
-            String hoverablePrefix = "<hover:\"" +
-                    tag.description +
-                    "\">" +
-                    tag.prefix +
-                    "</hover>";
-            PrefixNode prefixNode = PrefixNode.builder(hoverablePrefix, 10).build();
+            PrefixNode prefixNode = buildPrefixNode(id);
             user.data().add(prefixNode);
         }, _ -> Component.literal("Successfully assigned tag " + id + " to you"));
         return Command.SINGLE_SUCCESS;
@@ -348,13 +354,7 @@ public final class TagCommands {
             }
             user.data().clear(
                     node -> node.getType() == NodeType.PREFIX && ((PrefixNode) node).getPriority() >= 10);
-            Tag tag = config.tags.get(id);
-            String sb = "<hover:\"" +
-                    tag.description +
-                    "\">" +
-                    tag.prefix +
-                    "</hover>";
-            PrefixNode prefixNode = PrefixNode.builder(sb, 10).build();
+            PrefixNode prefixNode = buildPrefixNode(id);
             user.data().add(prefixNode);
         }, exactName -> Component.literal("Successfully assigned tag " + id + " to " + exactName));
         return Command.SINGLE_SUCCESS;
@@ -420,42 +420,16 @@ public final class TagCommands {
     }
 
     private void modifyOfflineUser(CommandSourceStack source, String name, Consumer<User> modifyingFunction, Function<String, Component> successMessage) {
-        CompletableFuture<String> modifyFuture = getProfileFromName(name).thenComposeAsync(profile -> {
-            getUserManager().modifyUser(parseUUID(profile.id), modifyingFunction);
-            return CompletableFuture.completedFuture(profile.name);
-        });
-        modifyFuture.whenCompleteAsync((player, exception) -> {
-            if (exception != null) {
-                logger.error("An exception occurred when getting User from LuckPerms", exception);
-                source.sendSystemMessage(Component.literal("An exception occurred when getting User from LuckPerms").withColor(TextColor.RED));
-                return;
-            }
-            source.sendSystemMessage(successMessage.apply(player));
-        });
-    }
-
-    private static CompletableFuture<MojangProfile> getProfileFromName(String name) {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.mojang.com/users/profiles/minecraft/" + name))
-                .GET()
-                .build();
-
-        try (HttpClient client = HttpClient.newHttpClient()) {
-            return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                    .thenApply(response -> {
-                        // Status 204 means the player does not exist
-                        if (response.statusCode() == 204) return null;
-
-                        return new Gson().fromJson(response.body(), MojangProfile.class);
-                    });
-        } catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    private static UUID parseUUID(String uuidString) {
-        return UUID.fromString(uuidString.replaceFirst(
-                "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5"));
+        getUserManager().lookupUniqueId(name)
+                .thenComposeAsync(id -> getUserManager().modifyUser(id, modifyingFunction))
+                .whenCompleteAsync((_, exception) -> {
+                    if (exception != null) {
+                        logger.error("An exception occurred when getting User from LuckPerms", exception);
+                        source.sendSystemMessage(Component.literal("An exception occurred when getting User from LuckPerms").withColor(TextColor.RED));
+                        return;
+                    }
+                    source.sendSystemMessage(successMessage.apply(name));
+                });
     }
 
     private @NonNull String getTagPreview(String id, Tag tag) {
@@ -509,10 +483,5 @@ public final class TagCommands {
         CommonButtonData exitButtonData = new CommonButtonData(Component.translatable("gui.back"), CommonButtonData.DEFAULT_WIDTH);
         ActionButton exitButton = new ActionButton(exitButtonData, Optional.empty());
         return new MultiActionDialog(dialogData, actionButtons, Optional.of(exitButton), 1);
-    }
-
-    static class MojangProfile {
-        String id;   // The UUID (un-dashed)
-        String name; // The exact username
     }
 }
