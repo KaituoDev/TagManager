@@ -1,0 +1,24 @@
+plugins {
+    id 'java-library'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://libraries.minecraft.net"
+    }
+}
+
+dependencies {
+    compileOnly 'com.google.code.gson:gson:2.13.1'
+    compileOnly 'org.slf4j:slf4j-api:2.0.16'
+    compileOnly 'org.jspecify:jspecify:1.0.0'
+    compileOnly 'net.luckperms:api:5.5'
+    compileOnly 'com.mojang:brigadier:1.0.18'
+    implementation 'net.kyori:adventure-text-minimessage:5.2.0'
+    implementation 'net.kyori:adventure-text-serializer-plain:5.2.0'
+}

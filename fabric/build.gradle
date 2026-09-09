@@ -1,0 +1,76 @@
+plugins {
+    id 'com.gradleup.shadow' version '9.6.1'
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'com.github.gmazzo.buildconfig' version '6.0.10'
+}
+
+buildConfig {
+    className = "BuildConstants"
+    packageName = "fun.kaituo.tagmanager.fabric"
+    useJavaOutput()
+
+    // Custom build constants
+    buildConfigField("String", "ID", "\"${project.project_name}\"")
+    buildConfigField("String", "VERSION", "\"${project.version}\"")
+}
+
+repositories {
+    maven {
+        url "https://maven.nucleoid.xyz/"
+        name "Nucleoid"
+    }
+}
+
+configurations {
+    // Dependencies bundled into the final mod jar via shadowJar.
+    shade
+}
+
+dependencies {
+    // To change the versions see the gradle.properties file
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    // Fabric API. This is technically optional, but you probably want it anyway.
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    compileOnly 'net.luckperms:api:5.5'
+    implementation 'me.lucko:fabric-permissions-api:0.7.0'
+    // The platform module supplies the Fabric Audience bridge at runtime. Keep it
+    // as a nested mod so servers do not need to install Adventure separately.
+    implementation 'net.kyori:adventure-platform-fabric:7.1.1'
+    include 'net.kyori:adventure-platform-fabric:7.1.1'
+
+    implementation project(':common')
+    shade project(':common')
+}
+
+processResources {
+    def version = rootProject.version
+    inputs.property "version", version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": version
+    }
+}
+
+java {
+    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+    // if it is present.
+    // If you remove this line, sources will not be generated.
+    withSourcesJar()
+
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+shadowJar {
+    // Bundle only :common (and this project's own classes). Minecraft, Fabric API,
+    // loader and the other libraries are provided externally, not shaded.
+    configurations = [project.configurations.shade]
+    archiveFileName = "TagManager-Fabric-${rootProject.version}.jar"
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.shadowJar
+}

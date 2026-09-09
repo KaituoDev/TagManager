@@ -14,7 +14,7 @@
 	"environment":  "server",
 	"entrypoints": {
 		"main": [
-			"fun.kaituo.tagmanager.TagManager"
+			"fun.kaituo.tagmanager.fabric.TagManager"
 		]
 	},
 	"mixins": [
