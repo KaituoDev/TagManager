@@ -1,0 +1,44 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://repo.papermc.io/repository/maven-public/'
+        name 'papermc'
+    }
+}
+
+dependencies {
+    compileOnly 'io.papermc.paper:paper-api:26.2.build.+'
+    compileOnly 'net.luckperms:api:5.5'
+
+    implementation project(':common')
+}
+
+processResources {
+    inputs.property 'version', rootProject.version
+    filesMatching('plugin.yml') {
+        expand version: rootProject.version
+    }
+}
+
+jar {
+    archiveClassifier = 'dev'
+}
+
+shadowJar {
+    archiveFileName = "TagManager-Paper-${rootProject.version}.jar"
+    // Paper supplies Adventure. Bundling another copy risks linkage conflicts
+    // with CommandSender and Paper's native dialog API.
+    dependencies {
+        exclude(dependency('net.kyori:.*:.*'))
+        exclude(dependency('org.jspecify:jspecify:.*'))
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.shadowJar
+}

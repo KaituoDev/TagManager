@@ -1,0 +1,6 @@
+name: TagManager
+version: '${version}'
+main: fun.kaituo.tagmanager.paper.TagManagerPlugin
+api-version: '26.2'
+authors: [LeChocolatChaud]
+depend: [LuckPerms]
