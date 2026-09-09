@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.6.1'
+    id 'com.github.gmazzo.buildconfig' version '6.0.10'
+}
+
+buildConfig {
+    className = "BuildConstants"
+    packageName = "fun.kaituo.tagmanager.velocity"
+    useJavaOutput()
+
+    // Custom build constants
+    buildConfigField(String, "ID", project.project_name)
+    buildConfigField(String, "VERSION", project.version)
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://repo.papermc.io/repository/maven-public/'
+        name 'papermc'
+    }
+}
+
+dependencies {
+    compileOnly 'com.velocitypowered:velocity-api:4.1.0-SNAPSHOT'
+    annotationProcessor 'com.velocitypowered:velocity-api:4.1.0-SNAPSHOT'
+    compileOnly 'net.luckperms:api:5.5'
+    implementation project(':common')
+    // Bundled by shadowJar; needed at runtime by :common (TagsMap uses gson).
+    implementation 'com.google.code.gson:gson:2.13.1'
+}
+
+jar {
+    // Unshaded dev artifact. The distributable plugin jar is produced by shadowJar.
+    archiveClassifier = 'dev'
+}
+
+shadowJar {
+    // Bundles runtimeClasspath = :common + this project's classes. velocity-api and
+    // luckperms are compileOnly and stay out of the jar.
+    archiveFileName = "TagManager-Velocity-${project.version}.jar"
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.shadowJar
+}
