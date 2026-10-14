@@ -17,6 +17,9 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.context.DefaultContextKeys;
+import net.luckperms.api.model.PermissionHolder;
+import net.luckperms.api.model.group.Group;
+import net.luckperms.api.model.group.GroupManager;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.model.user.UserManager;
 import net.luckperms.api.node.NodeType;
@@ -319,7 +322,7 @@ public abstract class TagCommands<S> {
     }
 
     private boolean ownsTag(User user, String id) {
-        return user.getNodes(NodeType.PERMISSION).stream().anyMatch(node -> tagNodeFilter(node) && node.getPermission().endsWith("." + id));
+        return getUserObtainedTags(user).containsKey(id);
     }
 
     private void assign(User user, String id) {
@@ -335,7 +338,25 @@ public abstract class TagCommands<S> {
 
     private Map<String, Tag> getUserObtainedTags(@NonNull User user) {
         Map<String, Tag> result = new LinkedHashMap<>();
-        user.getNodes(NodeType.PERMISSION).stream().filter(TagCommands::tagNodeFilter).map(TagCommands::idFromTagNode).filter(Objects::nonNull).distinct().map(id -> new AbstractMap.SimpleEntry<>(id, config.tags.get(id))).filter(e -> e.getValue() != null).forEach(e -> result.put(e.getKey(), e.getValue()));
+        GroupManager groups = LuckPermsProvider.get().getGroupManager();
+        Deque<PermissionHolder> pending = new ArrayDeque<>();
+        Set<String> visitedGroups = new HashSet<>();
+        pending.add(user);
+
+        while (!pending.isEmpty()) {
+            PermissionHolder holder = pending.removeFirst();
+            for (PermissionNode node : holder.getNodes(NodeType.PERMISSION)) {
+                if (!tagNodeFilter(node)) continue;
+                String id = idFromTagNode(node);
+                Tag tag = config.tags.get(id);
+                if (tag != null) result.put(id, tag);
+            }
+            for (var node : holder.getNodes(NodeType.INHERITANCE)) {
+                if (!node.getValue() || !visitedGroups.add(node.getGroupName())) continue;
+                Group group = groups.getGroup(node.getGroupName());
+                if (group != null) pending.addLast(group);
+            }
+        }
         return result;
     }
 
