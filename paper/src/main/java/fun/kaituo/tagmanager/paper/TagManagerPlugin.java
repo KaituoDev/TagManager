@@ -44,7 +44,6 @@ public final class TagManagerPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         // Shutdown persistence is deliberately synchronous so server exit cannot outrun writes.
-        if (configuration != null) configuration.save();
         if (tags != null) tags.save();
         getServer().getMessenger().unregisterIncomingPluginChannel(this);
     }

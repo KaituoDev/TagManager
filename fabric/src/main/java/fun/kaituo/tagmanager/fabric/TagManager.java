@@ -29,10 +29,6 @@ public class TagManager implements ModInitializer {
         config.load();
         ServerLifecycleEvents.SERVER_STARTED.register(server -> this.server = server);
         StandaloneTagDialogRenderer dialogRenderer = new StandaloneTagDialogRenderer(() -> server);
-        ServerLifecycleEvents.SERVER_STOPPING.register(_ -> {
-            LOGGER.info("Server stopping... saving mod config.");
-            config.save();
-        });
         if (!config.getConfig().network) {
             File tagsFile = new File(configDir.toFile(), "tags.json");
             TagsMap tagsMap = new TagsMap(tagsFile, tags, LOGGER);
