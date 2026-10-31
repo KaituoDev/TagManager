@@ -20,7 +20,8 @@ LuckPerms is required on every platform that runs Tag Manager.
 ### Standalone Fabric or Paper
 
 Install the matching Tag Manager artifact and LuckPerms on the server. Fabric
-also needs its declared Fabric API and permissions dependencies. On first
+also needs its declared Fabric API and permissions dependencies. Adventure and
+Placeholder API are bundled in the Fabric artifact. On first
 startup, Tag Manager creates `config.json` and `tags.json` in its platform data
 directory. Leave `network` set to `false` (the default).
 
