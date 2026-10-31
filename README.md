@@ -66,6 +66,12 @@ Tag IDs are command words (no spaces). Prefixes and descriptions are parsed as
 MiniMessage, so escape untrusted text before writing it to the file. Use
 `/tags reload` after a manual edit.
 
+Legacy section-sign codes such as `§a`, `§l`, and `§r` are automatically converted
+to named MiniMessage tags when tags are loaded or created on every platform
+(for example, `§cRed` becomes `<red>Red</red>`). Both
+`§#RRGGBB` and `§x§R§R§G§G§B§B` hex colors are supported. Converted prefixes and
+descriptions are written in MiniMessage format the next time tags are saved.
+
 ## Commands
 
 | Command | Purpose | Permission |
@@ -99,11 +105,20 @@ For example:
 Use Java 25 and run:
 
 ```sh
-./gradlew build
+./gradlew :build
 ```
 
-The distributable artifacts are written to each platform module's
-`build/libs` directory. `:common` contains the shared command, tag-storage,
+The root tasks provide a unified entry point:
+
+| Task | Purpose |
+| --- | --- |
+| `:build` | Build and check every module, then collect the installable jars |
+| `:jar` | Package all three platforms and collect their installable jars |
+| `:clean` | Remove the root and every module's build outputs |
+
+The three installable jars are collected into the root `build/libs` directory.
+Individual module artifacts remain in their own `build/libs` directories.
+`:common` contains the shared command, tag-storage,
 MiniMessage, and dialog-request abstractions; the platform modules supply the
 native command, threading, and dialog integrations.
 

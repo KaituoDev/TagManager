@@ -10,7 +10,7 @@ public class Tag {
     public String description;
 
     public Tag(@NonNull String prefix, @Nullable String description) {
-        this.prefix = prefix;
-        this.description = description;
+        this.prefix = TagText.convertLegacyCodes(prefix);
+        this.description = description == null ? null : TagText.convertLegacyCodes(description);
     }
 }

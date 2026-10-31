@@ -2,6 +2,8 @@ package fun.kaituo.tagmanager;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
 import org.slf4j.Logger;
@@ -16,7 +18,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 public final class TagsMap {
-    public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    public static final Gson GSON = new GsonBuilder()
+            .registerTypeAdapter(Tag.class, (JsonDeserializer<Tag>) (json, type, context) -> {
+                JsonObject value = json.getAsJsonObject();
+                return new Tag(context.deserialize(value.get("prefix"), String.class),
+                        context.deserialize(value.get("description"), String.class));
+            })
+            .disableHtmlEscaping()
+            .setPrettyPrinting()
+            .create();
     private static final Executor READ_EXECUTOR = command -> Thread.ofVirtual().name("tag-manager-read-", 0).start(command);
     private static final Executor WRITE_EXECUTOR = command -> Thread.ofPlatform().name("tag-manager-write-", 0).start(command);
     private final File configFile;

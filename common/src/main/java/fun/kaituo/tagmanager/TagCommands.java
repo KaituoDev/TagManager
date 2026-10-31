@@ -14,6 +14,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.context.DefaultContextKeys;
@@ -39,7 +40,7 @@ import java.util.function.Predicate;
  * Platform-neutral commands. Platform modules provide source access and dialog rendering.
  */
 public abstract class TagCommands<S> {
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    private static final MiniMessage MINI_MESSAGE = TagText.miniMessage();
     private final Logger logger;
     private final TagsMap config;
     private final TagDialogRenderer dialogs;
@@ -136,10 +137,13 @@ public abstract class TagCommands<S> {
         S source = context.getSource();
         Optional<UUID> player = playerId(source);
         if (player.isEmpty()) return usage(context);
-        getUserManager().loadUser(player.orElseThrow()).whenCompleteAsync((user, failure) -> {
-            if (user == null || failure != null) usage(context);
-            else dialogs.showTagSelector(player.orElseThrow(), Map.copyOf(getUserObtainedTags(user)));
-        }, mainThreadExecutor());
+        getUserManager().loadUser(player.orElseThrow())
+                .thenAcceptAsync(user -> dialogs.showTagSelector(player.orElseThrow(), Map.copyOf(getUserObtainedTags(user))), mainThreadExecutor())
+                .exceptionally(failure -> {
+                    logger.error("Failed to open tag selector for {}", player.orElseThrow(), failure);
+                    mainThreadExecutor().execute(() -> send(source, "<red>Failed to open tag selector; see the server log for details."));
+                    return null;
+                });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -328,8 +332,9 @@ public abstract class TagCommands<S> {
     private void assign(User user, String id) {
         clearAssignedTag(user);
         Tag tag = config.tags.get(id);
-        String hover = tag.description == null ? tag.prefix : "<hover:show_text:\"" + tag.description + "\">" + tag.prefix + "</hover>";
-        user.data().add(PrefixNode.builder(hover, 10).build());
+        Component prefix = component(tag.prefix);
+        if (tag.description != null) prefix = prefix.hoverEvent(HoverEvent.showText(component(tag.description)));
+        user.data().add(PrefixNode.builder(MINI_MESSAGE.serialize(prefix), 10).build());
     }
 
     private void clearAssignedTag(User user) {

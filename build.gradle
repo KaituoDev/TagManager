@@ -1,3 +1,7 @@
+plugins {
+    id 'base'
+}
+
 subprojects {
     group = 'fun.kaituo.tagmanager'
     version = project.version
@@ -5,4 +9,36 @@ subprojects {
     tasks.withType(JavaCompile).configureEach {
         options.release = 25
     }
+}
+
+def platformArtifacts = [
+        fabric: 'jar',
+        paper: 'shadowJar',
+        velocity: 'shadowJar'
+]
+
+def collectJars = tasks.register('jar', Sync) {
+    group = 'build'
+    description = 'Packages all platforms and collects their installable jars in build/libs.'
+    into layout.buildDirectory.dir('libs')
+    platformArtifacts.each { platform, taskName ->
+        def artifact = project(":${platform}").tasks.named(taskName, Jar)
+        from artifact.flatMap { it.archiveFile }
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn collectJars
+}
+
+tasks.named('check') {
+    dependsOn subprojects.collect { "${it.path}:check" }
+}
+
+tasks.named('build') {
+    dependsOn subprojects.collect { "${it.path}:build" }
+}
+
+tasks.named('clean') {
+    dependsOn subprojects.collect { "${it.path}:clean" }
 }

@@ -3,8 +3,8 @@ package fun.kaituo.tagmanager.fabric;
 import fun.kaituo.tagmanager.Tag;
 import fun.kaituo.tagmanager.TagDialogRenderer;
 import fun.kaituo.tagmanager.TagDialogRequest;
+import fun.kaituo.tagmanager.TagText;
 import net.kyori.adventure.platform.modcommon.MinecraftServerAudiences;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
@@ -55,7 +55,7 @@ final class StandaloneTagDialogRenderer implements TagDialogRenderer {
         CommonDialogData data = new CommonDialogData(Component.literal("Choose a tag to assign"), Optional.empty(), true, true, DialogAction.CLOSE, List.of(), List.of());
         List<ActionButton> buttons = new ArrayList<>();
         tags.forEach((id, tag) -> {
-            CommonButtonData button = new CommonButtonData(toNativeComponent(tag.prefix), Optional.ofNullable(toNativeComponent(tag.description)), CommonButtonData.DEFAULT_WIDTH);
+            CommonButtonData button = new CommonButtonData(toNativeComponent(tag.prefix), Optional.ofNullable(tag.description).map(this::toNativeComponent), CommonButtonData.DEFAULT_WIDTH);
             buttons.add(new ActionButton(button, Optional.of(new StaticAction(new ClickEvent.RunCommand("tags assign " + id)))));
         });
         buttons.add(new ActionButton(new CommonButtonData(Component.literal("Clear your tag"), CommonButtonData.DEFAULT_WIDTH), Optional.of(new StaticAction(new ClickEvent.RunCommand("tags unassign")))));
@@ -64,7 +64,7 @@ final class StandaloneTagDialogRenderer implements TagDialogRenderer {
     }
 
     private Component toNativeComponent(String miniMessageFormat) {
-        net.kyori.adventure.text.Component advComponent = MiniMessage.miniMessage().deserialize(miniMessageFormat);
+        net.kyori.adventure.text.Component advComponent = TagText.miniMessage().deserialize(miniMessageFormat);
         return MinecraftServerAudiences.of(server.get()).nonWrappingSerializer().serialize(advComponent);
     }
 

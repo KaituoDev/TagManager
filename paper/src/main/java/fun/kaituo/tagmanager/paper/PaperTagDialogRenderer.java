@@ -3,6 +3,7 @@ package fun.kaituo.tagmanager.paper;
 import fun.kaituo.tagmanager.Tag;
 import fun.kaituo.tagmanager.TagDialogRenderer;
 import fun.kaituo.tagmanager.TagDialogRequest;
+import fun.kaituo.tagmanager.TagText;
 import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.registry.data.dialog.ActionButton;
 import io.papermc.paper.registry.data.dialog.DialogBase;
@@ -20,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 final class PaperTagDialogRenderer implements TagDialogRenderer {
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    private static final MiniMessage MINI_MESSAGE = TagText.miniMessage();
     private final Server server;
 
     PaperTagDialogRenderer(Server server) {

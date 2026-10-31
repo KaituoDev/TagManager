@@ -13,6 +13,10 @@ repositories {
     }
 }
 
+configurations {
+    testImplementation.extendsFrom compileOnly
+}
+
 dependencies {
     compileOnly 'com.google.code.gson:gson:2.13.1'
     compileOnly 'org.slf4j:slf4j-api:2.0.16'
@@ -21,4 +25,11 @@ dependencies {
     compileOnly 'com.mojang:brigadier:1.0.18'
     implementation 'net.kyori:adventure-text-minimessage:5.2.0'
     implementation 'net.kyori:adventure-text-serializer-plain:5.2.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
+    testImplementation 'net.kyori:adventure-text-serializer-legacy:5.2.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }

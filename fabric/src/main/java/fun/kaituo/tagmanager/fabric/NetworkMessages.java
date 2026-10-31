@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.NonNull;
 
 public final class NetworkMessages {
@@ -24,17 +25,20 @@ public final class NetworkMessages {
         });
     }
 
-    private record DialogPayload(byte[] bytes) implements CustomPacketPayload {
-        private static final Type<DialogPayload> TYPE = CustomPacketPayload.createType(TagDialogRequestCodec.CHANNEL);
-        private static final StreamCodec<RegistryFriendlyByteBuf, DialogPayload> STREAM_CODEC =
+    record DialogPayload(byte[] bytes) implements CustomPacketPayload {
+        private static final Type<DialogPayload> TYPE = new Type<>(Identifier.parse(TagDialogRequestCodec.CHANNEL));
+        static final StreamCodec<RegistryFriendlyByteBuf, DialogPayload> STREAM_CODEC =
                 CustomPacketPayload.codec(DialogPayload::write, DialogPayload::read);
 
         private static DialogPayload read(RegistryFriendlyByteBuf buffer) {
-            return new DialogPayload(buffer.readByteArray(1_048_576));
+            // Velocity sends raw JSON; plugin messages have no byte-array length prefix.
+            byte[] bytes = new byte[buffer.readableBytes()];
+            buffer.readBytes(bytes);
+            return new DialogPayload(bytes);
         }
 
         private void write(RegistryFriendlyByteBuf buffer) {
-            buffer.writeByteArray(bytes);
+            buffer.writeBytes(bytes);
         }
 
         @Override public @NonNull Type<DialogPayload> type() { return TYPE; }

@@ -1,5 +1,4 @@
 plugins {
-    id 'com.gradleup.shadow' version '9.6.1'
     id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'com.github.gmazzo.buildconfig' version '6.0.10'
 }
@@ -21,11 +20,6 @@ repositories {
     }
 }
 
-configurations {
-    // Dependencies bundled into the final mod jar via shadowJar.
-    shade
-}
-
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
@@ -42,7 +36,14 @@ dependencies {
     include 'net.kyori:adventure-platform-fabric:7.1.1'
 
     implementation project(':common')
-    shade project(':common')
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    workingDir = layout.buildDirectory.get().asFile
 }
 
 processResources {
@@ -64,13 +65,8 @@ java {
     targetCompatibility = JavaVersion.VERSION_25
 }
 
-shadowJar {
-    // Bundle only :common (and this project's own classes). Minecraft, Fabric API,
-    // loader and the other libraries are provided externally, not shaded.
-    configurations = [project.configurations.shade]
+tasks.named('jar') {
+    // Loom nests included mods into this jar, including Adventure's runtime mixins.
+    from project(':common').sourceSets.main.output
     archiveFileName = "TagManager-Fabric-${rootProject.version}.jar"
-}
-
-tasks.named('assemble') {
-    dependsOn tasks.shadowJar
 }
