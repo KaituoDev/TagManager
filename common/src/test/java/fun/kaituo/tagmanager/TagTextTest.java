@@ -1,7 +1,6 @@
 package fun.kaituo.tagmanager;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -68,13 +67,40 @@ class TagTextTest {
     @Test
     void convertedResetsDoNotRemoveAnAssignedHover() {
         Tag tag = new Tag("§cRed§rPlain", "§eDescription with \"quotes\"");
-        Component prefix = TagText.miniMessage().deserialize(tag.prefix)
-                .hoverEvent(HoverEvent.showText(TagText.miniMessage().deserialize(tag.description)));
-        Component restored = TagText.miniMessage().deserialize(TagText.miniMessage().serialize(prefix));
+        String serialized = TagText.serializePrefix(tag);
+        Component restored = MiniMessage.builder().strict(true).build().deserialize(serialized);
 
+        assertTrue(serialized.startsWith("<hover:show_text:"));
+        assertTrue(serialized.endsWith("</hover>"));
         assertNotNull(restored.hoverEvent());
         assertEquals("Description with \"quotes\"", PlainTextComponentSerializer.plainText()
                 .serialize((Component) restored.hoverEvent().value()));
         assertEquals("RedPlain", PlainTextComponentSerializer.plainText().serialize(restored));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"A premium tag", "It's a \"premium\" tag: \\ path", "<gold>Premium</gold>", ""})
+    void serializesAnEnclosingHoverWithEscapedDescription(String description) {
+        String serialized = TagText.serializePrefix(new Tag("<gold>[VIP]</gold>", description));
+        assertTrue(serialized.startsWith("<hover:show_text:"));
+        assertTrue(serialized.endsWith("<gold>[VIP]</gold></hover>"));
+
+        Component restored = MiniMessage.builder().strict(true).build().deserialize(serialized);
+        assertNotNull(restored.hoverEvent());
+        assertEquals(TagText.miniMessage().deserialize(description), restored.hoverEvent().value());
+        assertEquals("[VIP]", PlainTextComponentSerializer.plainText().serialize(restored));
+    }
+
+    @Test
+    void omitsHoverWhenThereIsNoDescription() {
+        Tag tag = new Tag("<gold>[VIP]</gold>", null);
+        assertEquals(TagText.miniMessage().serialize(TagText.miniMessage().deserialize(tag.prefix)),
+                TagText.serializePrefix(tag));
+    }
+
+    @Test
+    void descriptionOverridesAnExistingPrefixHover() {
+        Tag tag = new Tag("<hover:show_text:'Old'><gold>[VIP]</gold></hover>", "New");
+        assertEquals("<hover:show_text:'New'><gold>[VIP]</gold></hover>", TagText.serializePrefix(tag));
     }
 }

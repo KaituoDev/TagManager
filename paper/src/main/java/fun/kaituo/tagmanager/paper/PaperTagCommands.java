@@ -10,6 +10,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.slf4j.Logger;
 
 import java.util.Collection;
@@ -20,9 +21,9 @@ import java.util.function.Predicate;
 
 final class PaperTagCommands extends TagCommands<CommandSourceStack> {
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
-    private final TagManagerPlugin plugin;
+    private final JavaPlugin plugin;
 
-    PaperTagCommands(TagsMap tags, Logger logger, TagDialogRenderer dialogs, TagManagerPlugin plugin) {
+    PaperTagCommands(TagsMap tags, Logger logger, TagDialogRenderer dialogs, JavaPlugin plugin) {
         super(tags, logger, dialogs);
         this.plugin = plugin;
     }

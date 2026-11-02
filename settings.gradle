@@ -16,5 +16,6 @@ include(
         'common',
         'fabric',
         'paper',
+        'paper-legacy',
         'velocity'
 )

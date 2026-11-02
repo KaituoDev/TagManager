@@ -1,0 +1,69 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://repo.papermc.io/repository/maven-public/'
+        name 'papermc'
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+}
+
+// Share Paper's command, configuration and network adapters without linking
+// the native Dialog API, which is unavailable on Paper 1.21.4.
+sourceSets.main.java {
+    srcDir '../paper/src/main/java'
+    exclude '**/TagManagerPlugin.java', '**/PaperTagDialogRenderer.java'
+}
+
+dependencies {
+    compileOnly 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
+    compileOnly 'net.luckperms:api:5.5'
+    implementation project(':common')
+
+    testImplementation 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+processResources {
+    inputs.property 'version', rootProject.version
+    filesMatching('plugin.yml') {
+        expand version: rootProject.version
+    }
+}
+
+jar {
+    archiveClassifier = 'dev'
+}
+
+shadowJar {
+    archiveFileName = "TagManager-Paper-Legacy-${rootProject.version}.jar"
+    dependencies {
+        exclude(dependency('net.kyori:.*:.*'))
+        exclude(dependency('org.jspecify:jspecify:.*'))
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.shadowJar
+}

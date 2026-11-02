@@ -14,6 +14,7 @@ subprojects {
 def platformArtifacts = [
         fabric: 'jar',
         paper: 'shadowJar',
+        'paper-legacy': 'shadowJar',
         velocity: 'shadowJar'
 ]
 

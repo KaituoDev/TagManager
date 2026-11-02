@@ -1,5 +1,7 @@
 package fun.kaituo.tagmanager;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import java.util.regex.Matcher;
@@ -22,6 +24,16 @@ public final class TagText {
 
     public static MiniMessage miniMessage() {
         return MINI_MESSAGE;
+    }
+
+    /** Serializes an assigned prefix with an explicit, enclosing hover tag. */
+    public static String serializePrefix(Tag tag) {
+        Component prefix = MINI_MESSAGE.deserialize(tag.prefix);
+        if (tag.description == null) return MINI_MESSAGE.serialize(prefix);
+        Component hovered = Component.empty()
+                .hoverEvent(HoverEvent.showText(MINI_MESSAGE.deserialize(tag.description)))
+                .append(prefix.hoverEvent(null));
+        return SERIALIZER.serialize(hovered);
     }
 
     /** Converts section-sign codes to MiniMessage with named, balanced tags. */

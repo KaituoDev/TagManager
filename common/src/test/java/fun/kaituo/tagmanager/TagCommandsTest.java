@@ -39,14 +39,14 @@ class TagCommandsTest {
     @BeforeEach
     void setUp() throws ReflectiveOperationException {
         loadedUser = new CompletableFuture<>();
-        UserManager users = stub(UserManager.class, (_, method, _) -> {
+        UserManager users = stub(UserManager.class, (proxy, method, args) -> {
             if (method.getName().equals("loadUser")) return loadedUser;
             throw new AssertionError(method);
         });
-        GroupManager groups = stub(GroupManager.class, (_, method, _) -> {
+        GroupManager groups = stub(GroupManager.class, (proxy, method, args) -> {
             throw new AssertionError(method);
         });
-        LuckPerms api = stub(LuckPerms.class, (_, method, _) -> switch (method.getName()) {
+        LuckPerms api = stub(LuckPerms.class, (proxy, method, args) -> switch (method.getName()) {
             case "getUserManager" -> users;
             case "getGroupManager" -> groups;
             default -> throw new AssertionError(method);
@@ -55,7 +55,7 @@ class TagCommandsTest {
         providerInstance.setAccessible(true);
         previousProvider = providerInstance.get(null);
         providerInstance.set(null, api);
-        logger = stub(Logger.class, (_, method, args) -> {
+        logger = stub(Logger.class, (proxy, method, args) -> {
             if (method.getName().equals("error")) {
                 failures.add((Throwable) args[args.length - 1]);
                 return null;
@@ -86,7 +86,7 @@ class TagCommandsTest {
     @Test
     void reportsMissingRendererDependency() throws Exception {
         NoClassDefFoundError missingBridge = new NoClassDefFoundError("MinecraftServerAudiences");
-        runTags(_ -> { throw missingBridge; });
+        runTags(request -> { throw missingBridge; });
 
         loadedUser.complete(emptyUser());
 
@@ -139,7 +139,7 @@ class TagCommandsTest {
     }
 
     private static User emptyUser() {
-        return stub(User.class, (_, method, _) -> {
+        return stub(User.class, (proxy, method, args) -> {
             if (method.getName().equals("getNodes")) return List.of();
             throw new AssertionError(method);
         });
@@ -154,7 +154,7 @@ class TagCommandsTest {
             super(tags, TagCommandsTest.this.logger, renderer);
         }
 
-        protected Predicate<Object> checkPermission(String permission) { return _ -> true; }
+        protected Predicate<Object> checkPermission(String permission) { return source -> true; }
         protected Audience audience(Object source) {
             return new Audience() {
                 @Override public void sendMessage(Component message) { messages.add(message); }

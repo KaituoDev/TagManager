@@ -14,7 +14,6 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.context.DefaultContextKeys;
@@ -296,7 +295,7 @@ public abstract class TagCommands<S> {
     private int unassignSelf(CommandContext<S> context) throws CommandSyntaxException {
         Optional<String> player = playerName(context.getSource());
         if (player.isEmpty()) throw error("The unassign command without an assignee can only be run by a player");
-        modifyOfflineUser(context.getSource(), player.orElseThrow(), this::clearAssignedTag, _ -> "Successfully unassigned all your tags");
+        modifyOfflineUser(context.getSource(), player.orElseThrow(), this::clearAssignedTag, ignored -> "Successfully unassigned all your tags");
         return Command.SINGLE_SUCCESS;
     }
 
@@ -332,9 +331,7 @@ public abstract class TagCommands<S> {
     private void assign(User user, String id) {
         clearAssignedTag(user);
         Tag tag = config.tags.get(id);
-        Component prefix = component(tag.prefix);
-        if (tag.description != null) prefix = prefix.hoverEvent(HoverEvent.showText(component(tag.description)));
-        user.data().add(PrefixNode.builder(MINI_MESSAGE.serialize(prefix), 10).build());
+        user.data().add(PrefixNode.builder(TagText.serializePrefix(tag), 10).build());
     }
 
     private void clearAssignedTag(User user) {
@@ -366,7 +363,7 @@ public abstract class TagCommands<S> {
     }
 
     private void modifyOfflineUser(S source, String name, Consumer<User> change, Function<String, String> success) {
-        getUserManager().lookupUniqueId(name).thenCompose(id -> getUserManager().modifyUser(id, change)).whenCompleteAsync((_, failure) -> {
+        getUserManager().lookupUniqueId(name).thenCompose(id -> getUserManager().modifyUser(id, change)).whenCompleteAsync((result, failure) -> {
             if (failure != null) {
                 logger.error("An exception occurred when modifying a LuckPerms user", failure);
                 send(source, "<red>An exception occurred when getting User from LuckPerms");

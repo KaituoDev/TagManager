@@ -3,7 +3,12 @@ plugins {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    options.release = 25
+    options.release = 21
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
@@ -23,13 +28,17 @@ dependencies {
     compileOnly 'org.jspecify:jspecify:1.0.0'
     compileOnly 'net.luckperms:api:5.5'
     compileOnly 'com.mojang:brigadier:1.0.18'
-    implementation 'net.kyori:adventure-text-minimessage:5.2.0'
-    implementation 'net.kyori:adventure-text-serializer-plain:5.2.0'
+    // Match the Adventure API provided by our oldest supported Paper server.
+    implementation 'net.kyori:adventure-text-minimessage:4.18.0'
+    implementation 'net.kyori:adventure-text-serializer-plain:4.18.0'
     testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
-    testImplementation 'net.kyori:adventure-text-serializer-legacy:5.2.0'
+    testImplementation 'net.kyori:adventure-text-serializer-legacy:4.18.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }

@@ -29,6 +29,13 @@ dependencies {
     implementation project(':common')
     // Bundled by shadowJar; needed at runtime by :common (TagsMap uses gson).
     implementation 'com.google.code.gson:gson:2.13.1'
+    testImplementation 'com.velocitypowered:velocity-api:4.1.0-SNAPSHOT'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }
 
 jar {
